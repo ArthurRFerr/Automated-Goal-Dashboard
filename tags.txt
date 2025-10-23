@@ -1,0 +1,308 @@
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -> utilizar para inicialização 
+PS C:\Users\TRIO44\Desktop\python.streamlit\venv\scripts> <- Ativar aqui
+PS C:\Users\TRIO44\Desktop\python.streamlit\venv\scripts> .\Activate.ps1 -> utilização do venv
+cd ..
+cd .. 
+PS C:\Users\TRIO44\Desktop\python.streamlit\venv\scripts> streamlit run main3.py
+
+credentials = {
+    "usernames": {
+        "Arthur": {
+            "name": "Arthur",
+            "password": "1234"
+        },
+        "Alex": {
+            "name": "Alex",
+            "password": "4321"
+        },
+        "Diego": {
+            "name": "Diego",
+            "password": "5678"
+        }
+    }
+}
+
+
+
+
+
+passwords = ["1234", "1234", "1234"]
+hashed_passwords = [bcrypt.hashpw(pwd.encode(), bcrypt.gensalt()).decode() for pwd in passwords]
+credentials = {
+    "usernames": {
+        "Arthur": {
+            "name": "Arthur",
+            "password": hashed_passwords[0]
+        },
+        "Alex": {
+            "name": "Alex",
+            "password": hashed_passwords[1]
+        },
+        "Diego": {
+            "name": "Diego",
+            "password": hashed_passwords[2]
+        }
+    }
+}
+#-------------------------Autenticador
+autenticador = stauth.Authenticate(credentials, "consumo_eventos", "abcdef", cookie_expiry_days=30)
+
+#tela de login
+name, authentication_status, username = autenticador.login(location="main")
+
+if authentication_status:
+    st.write(f"Bem-vindo(a) {name}")
+    st.markdown(
+        "<h1 style='color:#fb9800;'>Consumo e Descarte (Eventos)</h1>",
+    unsafe_allow_html=True
+    )
+     # ------------------------- Sidebar para escolha
+    st.sidebar.header("Filtros")
+    tipo = st.sidebar.radio("Selecione a categoria:", ["Alimentos", "Bebidas"])
+
+    # -------------------------Exibição condicional
+    if tipo == "Alimentos":
+        mostrar_dashboard(df_alimentos, "Alimentos")
+    elif tipo == "Bebidas":
+        mostrar_dashboard(df_bebidas, "Bebidas")
+elif authentication_status == False:
+    st.error("Usuário ou senha incorretos")
+else:
+    st.warning("Por favor, faça login")
+      
+
+
+
+
+
+
+
+
+
+
+import streamlit as st
+import pandas as pd
+import calendar
+import datetime
+
+# Descobre mês atual e quantos dias ele tem
+hoje = datetime.date.today()
+ano, mes = hoje.year, hoje.month
+num_dias = calendar.monthrange(ano, mes)[1]
+
+# Cria dataframe com todos os dias do mês atual
+data = {
+    "Dia": list(range(1, num_dias + 1)),
+    "SP Hall": ["Livre"] * num_dias,
+    "Trio Pérgola": ["Livre"] * num_dias,
+    "Berrine ONE": ["Livre"] * num_dias,
+    "Skylounge": ["Livre"] * num_dias,
+    "River one": ["Livre"] * num_dias,
+    "Trio 19": ["Livre"] * num_dias,
+}
+
+df = pd.DataFrame(data)
+
+# Função para colorir células
+def color_cells(val):
+    if val == "Livre":
+        return "background-color: lightgreen; color: black;"
+    elif val == "Ocupado":
+        return "background-color: red; color: white;"
+    elif val == "Negociação":
+        return "background-color: orange; color: black;"
+    return ""
+
+# Aplica estilo
+styled_df = df.style.applymap(color_cells, subset=["SP Hall", "Trio Pérgola"])
+
+st.write(f"📅 {calendar.month_name[mes]} {ano}")
+st.dataframe(styled_df, use_container_width=True)
+
+
+
+
+
+ st.markdown("### 📒 Vendas registradas")
+    vendas = st.session_state["dados"][mes_atual]["vendas"]
+
+    vendas_padronizadas = []
+    for v in vendas:
+        if isinstance(v, (int, float)):
+            vendas_padronizadas.append({"valor": v, "hora": datetime.now()})
+        else:
+            vendas_padronizadas.append(v)
+    st.session_state["dados"][mes_atual]["vendas"] = vendas_padronizadas
+
+    if vendas_padronizadas:
+         for i, v in enumerate(vendas_padronizadas[::-1], 1):
+            st.write(f"Venda {i}: {format_currency(v['valor'], 'BRL', locale='pt_BR')} registrada em {v['hora'].strftime('%d/%m/%Y %H:%M')}")
+
+    else:
+        st.info("Nenhuma venda registrada ainda.")
+
+
+
+
+    st.subheader(f"🎯 Meta: {meta_fmt} ")
+
+         st.subheader(f"🎯 Meta de {mes_atual}: {meta_fmt} ")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+count = st_autorefresh(interval=60*1000, key="meta_refresh")
+
+img_path = Path("TrioCIDG.jpg")
+
+# 5️⃣ Função para converter em base64
+def get_base64_of_image(image_file):
+    with open(image_file, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+img_base64 = get_base64_of_image(img_path)
+
+#---------------------------------------------------
+# 3️⃣ Aplica fundo no Streamlit
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{img_base64}");
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        width: 100%;
+        height: 100%;
+        background-position: center;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+titulo = st.empty()
+titulo.title(f"📊Acompanhamento de Vendas ")
+
+
+#------conexão com Google Sheets----------------
+scope = [ "https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive.file"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("metadevenda-9750bb128912.json", scope)
+client = gspread.authorize(creds)
+
+SHEET_NAME = "MetaVendas"   # nome da planilha
+sheet = client.open(SHEET_NAME).sheet1
+data = sheet.get_all_records()
+df = pd.DataFrame(data)
+
+try:
+    locale.setlocale(locale.LC_TIME, "pt_BR.UTF-8")  # Linux/Mac
+except:
+    locale.setlocale(locale.LC_TIME, "portuguese")
+
+#meses = df["mes"].tolist()
+#mes_atual = st.sidebar.selectbox("Selecione o mês:", meses)
+
+df['mes_normalizado'] = df['mes'].str.strip().str.capitalize()
+meses = df['mes_normalizado'].dropna().unique()
+meses.sort()  # opcional: ordem cronológica
+
+mes_atual = st.sidebar.selectbox("Selecione o mês:", meses)
+titulo.title(f"📊Acompanhamento de Vendas - {mes_atual}")
+
+
+# Filtra usando o mês normalizado
+
+df_mes = df[df["mes_normalizado"] == mes_atual]
+
+if df_mes.empty:
+    st.warning("❌ Nenhum dado encontrado para o mês selecionado.")
+    st.stop()
+
+meta_valor = float(df_mes["meta"].iloc[0])
+
+
+
+realizado_valor = df_mes["venda"].astype(float).sum()
+
+
+if meta_valor > 0:
+    progresso = min(realizado_valor / meta_valor, 1.0)
+
+    # Barra de progresso
+    #st.progress(progresso)
+
+    # Formatar valores em moeda
+    meta_fmt = format_currency(meta_valor, "BRL", locale="pt_BR")
+    realizado_fmt = format_currency(realizado_valor, "BRL", locale="pt_BR")
+
+    st.subheader(f"Meta: {meta_fmt} ")
+
+    # KPI estilizado com HTML
+    st.markdown(
+        f"""
+        <div style="text-align: center; font-size: 55px; font-weight: bold;
+                    color: {'lightgreen' if progresso >= 1 else 'orange' if progresso >= 0.5 else 'red'};">
+            {progresso*100:.2f}%
+        </div>
+        <div style="text-align: center; font-size: 50px;">
+            Realizado: {realizado_fmt} 
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+
+    hoje = datetime.now()
+    ano, mes = hoje.year, hoje.month
+    dias_no_mes = monthrange(ano, mes)[1]
+    dia_atual = hoje.day
+
+    progresso_tempo = dia_atual / dias_no_mes
+    progresso_vendas = realizado_valor / meta_valor
+    faltante = max(meta_valor - realizado_valor, 0)
+    progresso_faltante =  faltante / meta_valor
+
+    st.subheader("Comparativo:")
+
+# KPIs lado a lado
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Tempo decorrido", f"{progresso_tempo*100:.1f}%")
+    with col2:
+        st.metric("Valor para atingir meta", format_currency(faltante, "BRL", locale="pt_BR"))
+
+    # Barras de progresso
+    #st.write("### Progresso")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"""
+        <style>
+        .stProgress > div > div > div > div {{
+         background-color: white;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+        st.write("Tempo do mês")
+        st.progress(progresso_tempo)
+        st.write("Vendas realizadas")
+        st.progress(progresso_vendas)
+    
+else:
+    st.warning("Defina uma meta para começar 🚀")
